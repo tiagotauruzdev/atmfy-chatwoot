@@ -6,13 +6,16 @@ const conversation = (id, stage) => ({
   custom_attributes: stage ? { [STAGE_ATTRIBUTE_KEY]: stage } : {},
 });
 
+// O getter `attributes/getConversationAttributes` passa os registros por
+// camelcaseKeys, então as definições chegam em camelCase — enquanto as conversas,
+// que vêm de outro módulo, mantêm snake_case. As duas convenções convivem.
 describe('stageValuesFrom', () => {
   it('reads the list values of the funnel attribute', () => {
     const definitions = [
-      { attribute_key: 'empresa', attribute_values: [] },
+      { attributeKey: 'empresa', attributeValues: [] },
       {
-        attribute_key: STAGE_ATTRIBUTE_KEY,
-        attribute_values: ['Novo', 'Resolvido'],
+        attributeKey: STAGE_ATTRIBUTE_KEY,
+        attributeValues: ['Novo', 'Resolvido'],
       },
     ];
 
@@ -20,7 +23,7 @@ describe('stageValuesFrom', () => {
   });
 
   it('returns an empty list when the attribute is not defined', () => {
-    expect(stageValuesFrom([{ attribute_key: 'empresa' }])).toEqual([]);
+    expect(stageValuesFrom([{ attributeKey: 'empresa' }])).toEqual([]);
     expect(stageValuesFrom([])).toEqual([]);
     expect(stageValuesFrom(undefined)).toEqual([]);
   });

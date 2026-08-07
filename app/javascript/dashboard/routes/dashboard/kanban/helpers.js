@@ -5,13 +5,20 @@
  */
 export const STAGE_ATTRIBUTE_KEY = 'etapa_funil';
 
-/** Extrai os valores da lista de etapas das definições de atributo de conversa. */
+/**
+ * Extrai os valores da lista de etapas das definições de atributo de conversa.
+ *
+ * Atenção à convenção: o getter `attributes/getConversationAttributes` passa os
+ * registros por `camelcaseKeys`, então aqui os campos são camelCase. Já as
+ * conversas vêm de outro módulo e mantêm snake_case (`custom_attributes`). As
+ * duas convivem no mesmo componente — não unifique por engano.
+ */
 export function stageValuesFrom(definitions) {
   const definition = (definitions || []).find(
-    d => d.attribute_key === STAGE_ATTRIBUTE_KEY
+    d => d.attributeKey === STAGE_ATTRIBUTE_KEY
   );
 
-  return definition?.attribute_values || [];
+  return definition?.attributeValues || [];
 }
 
 const stageOf = conversation =>
