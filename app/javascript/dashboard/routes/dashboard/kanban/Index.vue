@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import Draggable from 'vuedraggable';
 
+import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 
@@ -14,8 +15,22 @@ import ConversationApi from 'dashboard/api/inbox/conversation';
 import {
   STAGE_ATTRIBUTE_KEY,
   buildFilterPayload,
+  cardFrom,
+  elapsedLabel,
   stageValuesFrom,
 } from './helpers';
+
+// As prioridades são escritas pelo agente e configuradas pelo operador, então a lista pode
+// crescer — valor desconhecido cai no tom neutro em vez de sumir do card.
+const PRIORITY_TONE = {
+  Crítica: 'bg-n-ruby-3 text-n-ruby-11',
+  Alta: 'bg-n-amber-3 text-n-amber-11',
+  Média: 'bg-n-iris-3 text-n-iris-11',
+  Baixa: 'bg-n-slate-3 text-n-slate-11',
+};
+
+const priorityTone = priority =>
+  PRIORITY_TONE[priority] || 'bg-n-slate-3 text-n-slate-11';
 
 const { t } = useI18n();
 const store = useStore();
@@ -44,10 +59,19 @@ const hasStages = computed(() => stages.value.length > 0);
 
 const keyOf = stage => (stage === null ? '__none__' : stage);
 
+// Cada item carrega a conversa crua ao lado do card já reduzido: o template desenha a
+// partir de `card`, e `moveTo` grava a partir de `conversation` — sem recalcular a
+// redução a cada render nem perder os campos que o card não mostra.
 const columns = computed(() =>
   [null, ...stages.value].map(stage => ({
     stage,
-    conversations: conversationsByStage.value[keyOf(stage)] || [],
+    items: (conversationsByStage.value[keyOf(stage)] || []).map(
+      conversation => ({
+        id: conversation.id,
+        conversation,
+        card: cardFrom(conversation),
+      })
+    ),
   }))
 );
 
@@ -94,7 +118,7 @@ onMounted(async () => {
 });
 
 const moveTo = async (stage, event) => {
-  const conversation = event?.added?.element;
+  const conversation = event?.added?.element?.conversation;
   if (!conversation) return;
 
   // Chamada direta em vez do `updateCustomAttributes` do store: aquela ação tem
@@ -123,9 +147,6 @@ const openConversation = conversation => {
     params: { accountId: accountId.value, conversation_id: conversation.id },
   });
 };
-
-const senderName = conversation =>
-  conversation.meta?.sender?.name || t('KANBAN.BOARD.UNKNOWN_CONTACT');
 
 const columnTitle = column =>
   column.stage === null ? t('KANBAN.BOARD.NO_STAGE') : column.stage;
@@ -191,29 +212,75 @@ const columnTitle = column =>
             {{ columnTitle(column) }}
           </span>
           <span class="text-xs text-n-slate-10">
-            {{ column.conversations.length }}
+            {{ column.items.length }}
           </span>
         </div>
 
         <Draggable
-          :model-value="column.conversations"
+          :model-value="column.items"
           group="kanban"
           item-key="id"
           class="flex flex-col gap-2 p-2 overflow-y-auto grow min-h-16"
           @change="event => moveTo(column.stage, event)"
         >
-          <template #item="{ element }">
+          <template #item="{ element: { conversation, card } }">
             <button
               type="button"
-              class="flex flex-col w-full gap-1 p-3 text-left border rounded-lg cursor-grab bg-n-solid-2 border-n-weak hover:border-n-brand"
-              @click="openConversation(element)"
+              class="flex flex-col w-full gap-2 p-3 text-left border rounded-lg cursor-grab bg-n-solid-2 border-n-weak hover:border-n-brand"
+              @click="openConversation(conversation)"
             >
-              <span class="text-sm font-medium truncate text-n-slate-12">
-                {{ senderName(element) }}
-              </span>
-              <span class="text-xs truncate text-n-slate-11">
-                {{ t('KANBAN.BOARD.CARD_ID', { id: element.id }) }}
-              </span>
+              <div class="flex items-center w-full gap-2">
+                <Avatar
+                  :src="card.avatarUrl"
+                  :name="card.name || t('KANBAN.BOARD.UNKNOWN_CONTACT')"
+                  :size="24"
+                  rounded-full
+                />
+                <div class="flex flex-col min-w-0 grow">
+                  <span class="text-sm font-medium truncate text-n-slate-12">
+                    {{ card.name || t('KANBAN.BOARD.UNKNOWN_CONTACT') }}
+                  </span>
+                  <span
+                    v-if="card.company"
+                    class="text-xs truncate text-n-slate-11"
+                  >
+                    {{ card.company }}
+                  </span>
+                </div>
+                <div class="flex items-center gap-1 shrink-0 text-n-slate-10">
+                  <Icon :icon="card.channelIcon" class="size-3.5" />
+                  <span class="text-xs tabular-nums">
+                    {{ elapsedLabel(card.lastActivityAt) }}
+                  </span>
+                </div>
+              </div>
+
+              <p
+                v-if="card.snippet"
+                class="text-xs leading-snug line-clamp-2 text-n-slate-11"
+              >
+                {{ card.snippet }}
+              </p>
+
+              <div class="flex flex-wrap items-center w-full gap-1">
+                <span
+                  v-if="card.priority"
+                  class="px-1.5 py-0.5 text-xs font-medium rounded"
+                  :class="priorityTone(card.priority)"
+                >
+                  {{ card.priority }}
+                </span>
+                <span
+                  v-for="label in card.labels"
+                  :key="label"
+                  class="px-1.5 py-0.5 text-xs rounded bg-n-alpha-2 text-n-slate-11"
+                >
+                  {{ label }}
+                </span>
+                <span class="ml-auto text-xs shrink-0 text-n-slate-10">
+                  {{ t('KANBAN.BOARD.CARD_ID', { id: card.id }) }}
+                </span>
+              </div>
             </button>
           </template>
         </Draggable>
