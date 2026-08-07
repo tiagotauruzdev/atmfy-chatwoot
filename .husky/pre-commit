@@ -5,7 +5,16 @@
 npx --no-install lint-staged
 
 # lint only staged ruby files
-git diff --name-only --cached | xargs ls -1 2>/dev/null | grep '\.rb$' | xargs bundle exec rubocop --force-exclusion
+#
+# O pipe direto para `xargs` rodava `bundle` mesmo sem nenhum .rb no stage — o xargs
+# executa o comando uma vez com lista vazia. Num commit so de JS a partir de uma maquina
+# sem Ruby no PATH (aqui o Ruby vive no container), isso derrubava o hook com exit 127.
+# `--diff-filter=d` ja descarta arquivo apagado, que era o papel do `ls -1`.
+ruby_files=$(git diff --name-only --cached --diff-filter=d | grep '\.rb$' || true)
+
+if [ -n "$ruby_files" ]; then
+  echo "$ruby_files" | xargs bundle exec rubocop --force-exclusion
+fi
 
 # stage rubocop changes to files
 # git diff --name-only --cached | xargs git add
