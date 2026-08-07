@@ -1,5 +1,13 @@
 {
   "KANBAN": {
+    "BOARD": {
+      "TITLE": "Kanban",
+      "SUBTITLE": "Open conversations by support stage",
+      "NO_STAGE": "No stage",
+      "UNKNOWN_CONTACT": "Unnamed contact",
+      "UNKNOWN_STAGE": "This stage no longer exists in settings",
+      "NO_ATTRIBUTE": "No stages configured. Create a list-type conversation custom attribute with the key etapa_funil under Settings → Custom Attributes."
+    },
     "PAYWALL": {
       "TITLE": "Upgrade to use Kanban",
       "DESCRIPTION": "The Kanban feature requires a Automatizefy Chatwoot Pro subscription.",
