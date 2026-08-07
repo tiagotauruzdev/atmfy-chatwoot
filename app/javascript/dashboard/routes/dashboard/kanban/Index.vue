@@ -8,49 +8,113 @@ import draggable from 'vuedraggable';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 
-import { STAGE_ATTRIBUTE_KEY, buildColumns, stageValuesFrom } from './helpers';
+import { useAlert } from 'dashboard/composables';
+import ConversationApi from 'dashboard/api/inbox/conversation';
+
+import {
+  STAGE_ATTRIBUTE_KEY,
+  buildFilterPayload,
+  stageValuesFrom,
+} from './helpers';
 
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 
-const conversations = useMapGetter('getAllConversations');
 const attributeDefinitions = useMapGetter(
   'attributes/getConversationAttributes'
 );
 const accountId = useMapGetter('getCurrentAccountId');
 
 const isLoading = ref(true);
+const loadError = ref(false);
+const selectedInboxId = ref(null);
+
+// O quadro guarda o resultado de cada coluna aqui, e não no store de conversas:
+// aquele é cache compartilhado com a lista de atendimento, então uma consulta
+// por coluna sobrescreveria a outra — e o quadro herdaria os filtros que o
+// usuário tivesse deixado na lista.
+const conversationsByStage = ref({});
 
 const stages = computed(() => stageValuesFrom(attributeDefinitions.value));
-const columns = computed(() => buildColumns(conversations.value, stages.value));
 
 // Sem o atributo cadastrado não existe quadro — e o operador precisa saber onde
 // criá-lo, senão vê uma tela vazia sem explicação.
 const hasStages = computed(() => stages.value.length > 0);
 
-onMounted(async () => {
+const keyOf = stage => (stage === null ? '__none__' : stage);
+
+const columns = computed(() =>
+  [null, ...stages.value].map(stage => ({
+    stage,
+    conversations: conversationsByStage.value[keyOf(stage)] || [],
+  }))
+);
+
+const loadColumn = async stage => {
+  const { data } = await ConversationApi.filter({
+    queryData: {
+      payload: buildFilterPayload({ stage, inboxId: selectedInboxId.value }),
+    },
+    page: 1,
+  });
+
+  conversationsByStage.value = {
+    ...conversationsByStage.value,
+    [keyOf(stage)]: data.payload || [],
+  };
+};
+
+const loadBoard = async () => {
+  isLoading.value = true;
+  loadError.value = false;
   try {
-    await Promise.all([
-      store.dispatch('attributes/get'),
-      store.dispatch('fetchAllConversations', { page: 1, status: 'open' }),
-    ]);
+    await Promise.all([null, ...stages.value].map(loadColumn));
+  } catch (error) {
+    loadError.value = true;
   } finally {
     isLoading.value = false;
   }
+};
+
+const inboxes = useMapGetter('inboxes/getInboxes');
+
+const onInboxChange = async event => {
+  const { value } = event.target;
+  selectedInboxId.value = value === '' ? null : value;
+  await loadBoard();
+};
+
+onMounted(async () => {
+  await Promise.all([
+    store.dispatch('attributes/get'),
+    store.dispatch('inboxes/get'),
+  ]);
+  await loadBoard();
 });
 
 const moveTo = async (stage, event) => {
   const conversation = event?.added?.element;
   if (!conversation) return;
 
-  await store.dispatch('updateCustomAttributes', {
-    conversationId: conversation.id,
-    customAttributes: {
-      ...conversation.custom_attributes,
-      [STAGE_ATTRIBUTE_KEY]: stage,
-    },
-  });
+  // Chamada direta em vez do `updateCustomAttributes` do store: aquela ação tem
+  // catch vazio, então uma gravação que falha some sem avisar ninguém — e o card
+  // fica na coluna nova mentindo até o próximo reload.
+  try {
+    await ConversationApi.updateCustomAttributes({
+      conversationId: conversation.id,
+      customAttributes: {
+        ...conversation.custom_attributes,
+        [STAGE_ATTRIBUTE_KEY]: stage,
+      },
+    });
+  } catch (error) {
+    useAlert(t('KANBAN.BOARD.MOVE_FAILED'));
+  } finally {
+    // Recarrega dos dois lados: a origem devolve o card se a gravação falhou,
+    // e o destino confirma o que o servidor realmente tem.
+    await loadBoard();
+  }
 };
 
 const openConversation = conversation => {
@@ -76,10 +140,32 @@ const columnTitle = column =>
       <span class="text-sm text-n-slate-11">
         {{ t('KANBAN.BOARD.SUBTITLE') }}
       </span>
+
+      <select
+        :value="selectedInboxId ?? ''"
+        class="h-8 py-0 ml-auto text-sm w-52 bg-n-alpha-2 border-n-weak rounded-lg"
+        :aria-label="t('KANBAN.BOARD.ALL_INBOXES')"
+        @change="onInboxChange"
+      >
+        <option value="">{{ t('KANBAN.BOARD.ALL_INBOXES') }}</option>
+        <option v-for="inbox in inboxes" :key="inbox.id" :value="inbox.id">
+          {{ inbox.name }}
+        </option>
+      </select>
     </header>
 
     <div v-if="isLoading" class="flex items-center justify-center flex-1">
       <Spinner />
+    </div>
+
+    <div
+      v-else-if="loadError"
+      class="flex flex-col items-center justify-center flex-1 gap-2 px-6 text-center"
+    >
+      <Icon class="text-n-ruby-9 size-6" icon="i-lucide-circle-alert" />
+      <p class="text-sm text-n-slate-11">
+        {{ t('KANBAN.BOARD.LOAD_FAILED') }}
+      </p>
     </div>
 
     <div
@@ -108,10 +194,6 @@ const columnTitle = column =>
             {{ column.conversations.length }}
           </span>
         </div>
-
-        <p v-if="column.isUnknown" class="px-3 py-1 text-xs text-n-slate-10">
-          {{ t('KANBAN.BOARD.UNKNOWN_STAGE') }}
-        </p>
 
         <draggable
           :model-value="column.conversations"

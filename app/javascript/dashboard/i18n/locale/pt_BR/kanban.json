@@ -6,6 +6,9 @@
       "NO_STAGE": "Sem etapa",
       "UNKNOWN_CONTACT": "Contato sem nome",
       "UNKNOWN_STAGE": "Etapa não existe mais nas configurações",
+      "ALL_INBOXES": "Todas as caixas",
+      "MOVE_FAILED": "Não foi possível mover o card. O quadro foi recarregado.",
+      "LOAD_FAILED": "Não foi possível carregar o quadro. Tente novamente.",
       "NO_ATTRIBUTE": "Nenhuma etapa configurada. Crie um atributo personalizado de conversa do tipo lista com a chave etapa_funil em Configurações → Atributos Personalizados."
     },
     "PAYWALL": {

@@ -6,6 +6,9 @@
       "NO_STAGE": "No stage",
       "UNKNOWN_CONTACT": "Unnamed contact",
       "UNKNOWN_STAGE": "This stage no longer exists in settings",
+      "ALL_INBOXES": "All inboxes",
+      "MOVE_FAILED": "Could not move the card. The board was reloaded.",
+      "LOAD_FAILED": "Could not load the board. Please try again.",
       "NO_ATTRIBUTE": "No stages configured. Create a list-type conversation custom attribute with the key etapa_funil under Settings → Custom Attributes."
     },
     "PAYWALL": {
