@@ -9,7 +9,8 @@
       "ALL_INBOXES": "All inboxes",
       "MOVE_FAILED": "Could not move the card. The board was reloaded.",
       "LOAD_FAILED": "Could not load the board. Please try again.",
-      "NO_ATTRIBUTE": "No stages configured. Create a list-type conversation custom attribute with the key etapa_funil under Settings → Custom Attributes."
+      "CARD_ID": "#{id}",
+      "NO_ATTRIBUTE": "No stages configured. Create a list-type conversation custom attribute with the key {key} under Settings → Custom Attributes."
     },
     "PAYWALL": {
       "TITLE": "Upgrade to use Kanban",

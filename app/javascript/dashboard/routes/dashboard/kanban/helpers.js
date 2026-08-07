@@ -57,37 +57,8 @@ export function buildFilterPayload({ stage, inboxId = null }) {
   }));
 }
 
-const stageOf = conversation =>
-  conversation?.custom_attributes?.[STAGE_ATTRIBUTE_KEY] || null;
-
-/**
- * Monta as colunas na ordem em que serão exibidas:
- *
- *   1. a coluna sem etapa (toda conversa nasce aqui — sem ela, sumiriam do quadro);
- *   2. as etapas definidas, na ordem do atributo;
- *   3. etapas órfãs — valores gravados em conversas que o operador renomeou ou
- *      removeu depois. Também não podem sumir, então ganham coluna marcada.
- */
-export function buildColumns(conversations, stages) {
-  const list = conversations || [];
-  const declared = stages || [];
-
-  const known = new Set(declared);
-  const orphans = [
-    ...new Set(
-      list.map(stageOf).filter(stage => stage !== null && !known.has(stage))
-    ),
-  ];
-
-  const column = (stage, isUnknown = false) => ({
-    stage,
-    isUnknown,
-    conversations: list.filter(item => stageOf(item) === stage),
-  });
-
-  return [
-    column(null),
-    ...declared.map(stage => column(stage)),
-    ...orphans.map(stage => column(stage, true)),
-  ];
-}
+// NOTA: houve aqui um `buildColumns` que agrupava as conversas no navegador e
+// criava coluna para etapa órfã (valor gravado que o operador renomeou depois).
+// Saiu quando a busca passou para o servidor — o quadro agora pergunta só pelas
+// etapas declaradas, e conversa com etapa inválida fica invisível. Lacuna
+// conhecida, ainda em aberto: ver o handoff.

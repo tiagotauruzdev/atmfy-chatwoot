@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useStore, useMapGetter } from 'dashboard/composables/store.js';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
-import draggable from 'vuedraggable';
+import Draggable from 'vuedraggable';
 
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
@@ -174,7 +174,7 @@ const columnTitle = column =>
     >
       <Icon class="text-n-slate-10 size-6" icon="i-lucide-columns-3" />
       <p class="text-sm text-n-slate-11">
-        {{ t('KANBAN.BOARD.NO_ATTRIBUTE') }}
+        {{ t('KANBAN.BOARD.NO_ATTRIBUTE', { key: STAGE_ATTRIBUTE_KEY }) }}
       </p>
     </div>
 
@@ -195,7 +195,7 @@ const columnTitle = column =>
           </span>
         </div>
 
-        <draggable
+        <Draggable
           :model-value="column.conversations"
           group="kanban"
           item-key="id"
@@ -212,11 +212,11 @@ const columnTitle = column =>
                 {{ senderName(element) }}
               </span>
               <span class="text-xs truncate text-n-slate-11">
-                #{{ element.id }}
+                {{ t('KANBAN.BOARD.CARD_ID', { id: element.id }) }}
               </span>
             </button>
           </template>
-        </draggable>
+        </Draggable>
       </div>
     </div>
   </section>
