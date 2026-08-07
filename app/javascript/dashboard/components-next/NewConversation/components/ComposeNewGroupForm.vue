@@ -174,7 +174,7 @@ defineExpose({ resetForm });
           <span>
             {{ t('GROUP.CREATE.GROUPS_DISABLED') }}
             <a
-              :href="wootConstants.FAZER_AI_GUIDES_URL"
+              :href="wootConstants.GUIDES_URL"
               target="_blank"
               rel="noopener noreferrer"
               class="underline font-medium"

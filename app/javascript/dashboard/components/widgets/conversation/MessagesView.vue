@@ -803,7 +803,7 @@ export default {
       });
     },
     onOpenGroupsEnabledLink() {
-      window.open(wootConstants.FAZER_AI_GUIDES_URL, '_blank');
+      window.open(wootConstants.GUIDES_URL, '_blank');
     },
     onOpenLinkDeviceModal() {
       this.showLinkDeviceModal = true;
