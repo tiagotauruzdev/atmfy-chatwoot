@@ -205,7 +205,7 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
   def voice_message?(type, attachment)
     return false unless type == 'audio' && attachment.file.content_type == 'audio/ogg'
 
-    # `is_recorded_audio` is the legacy fazer.ai meta key (transcode pipeline and old messages).
+    # `is_recorded_audio` is the legacy upstream meta key (transcode pipeline and old messages).
     (attachment.meta&.dig('is_voice_message') || attachment.meta&.dig('is_recorded_audio')).present?
   end
 

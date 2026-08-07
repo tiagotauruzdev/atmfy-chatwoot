@@ -680,7 +680,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     content.compact
   end
 
-  # `is_recorded_audio` is the legacy fazer.ai meta key (transcode pipeline and old messages).
+  # `is_recorded_audio` is the legacy upstream meta key (transcode pipeline and old messages).
   def voice_note_attachment?(attachment)
     meta = attachment.meta || {}
     meta['is_voice_message'].present? || meta['is_recorded_audio'].present?

@@ -1,4 +1,4 @@
-# NOTE: See https://github.com/fazer-ai/chatwoot/blob/main/CUSTOM_BRANDING.md for more details.
+# NOTE: See https://github.com/tiagotauruzdev/atmfy-chatwoot/blob/main/CUSTOM_BRANDING.md for more details.
 namespace :branding do
   desc 'Updates branding configurations from environment variables or defaults'
   task update: :environment do
