@@ -5,6 +5,7 @@ import {
   buildOrphanFilterPayload,
   cardFrom,
   elapsedLabel,
+  orphansFrom,
   stageValuesFrom,
 } from '../helpers';
 
@@ -69,29 +70,20 @@ describe('buildFilterPayload', () => {
 // Renomear uma etapa em Configurações NÃO reescreve as conversas já gravadas: elas ficam
 // com o nome antigo. Como cada coluna pergunta por uma etapa declarada, essas conversas
 // não apareciam em coluna nenhuma — nem em "Sem etapa", porque a chave existe. Sumiam sem
-// erro, que é o pior modo de falha. Esta consulta é a rede: tem a chave E não é nenhuma
-// das etapas conhecidas. O motor do Chatwoot não tem `not_in` (ver lib/filters/filter_keys.yml),
-// então é `is_present` encadeado com um `not_equal_to` por etapa.
+// erro, que é o pior modo de falha.
+//
+// A consulta pede só "tem a chave". A versão que encadeava um `not_equal_to` por etapa
+// devolveu 500 em produção: `custom_attribute_filter_helper.rb` cola um ` OR (...) IS NULL`
+// DEPOIS do query_operator, gerando `!= :valor AND  OR (...) IS NULL`. Na prática
+// `not_equal_to` sobre atributo customizado só funciona como ÚLTIMA condição.
 describe('buildOrphanFilterPayload', () => {
-  it('asks for conversations holding a stage that no longer exists', () => {
+  it('asks only for conversations that hold the attribute', () => {
     expect(buildOrphanFilterPayload({ stages: ['Novo', 'Resolvido'] })).toEqual(
       [
         {
           attribute_key: STAGE_ATTRIBUTE_KEY,
           filter_operator: 'is_present',
           values: [],
-          query_operator: 'AND',
-        },
-        {
-          attribute_key: STAGE_ATTRIBUTE_KEY,
-          filter_operator: 'not_equal_to',
-          values: ['Novo'],
-          query_operator: 'AND',
-        },
-        {
-          attribute_key: STAGE_ATTRIBUTE_KEY,
-          filter_operator: 'not_equal_to',
-          values: ['Resolvido'],
           query_operator: null,
         },
       ]
@@ -99,13 +91,11 @@ describe('buildOrphanFilterPayload', () => {
   });
 
   it('narrows to one inbox like the other columns do', () => {
-    const payload = buildOrphanFilterPayload({
-      stages: ['Novo'],
-      inboxId: 7,
-    });
+    const payload = buildOrphanFilterPayload({ stages: ['Novo'], inboxId: 7 });
 
-    expect(payload).toHaveLength(3);
-    expect(payload[2]).toEqual({
+    expect(payload).toHaveLength(2);
+    expect(payload[0].query_operator).toBe('AND');
+    expect(payload[1]).toEqual({
       attribute_key: 'inbox_id',
       filter_operator: 'equal_to',
       values: ['7'],
@@ -118,6 +108,39 @@ describe('buildOrphanFilterPayload', () => {
   it('returns nothing when there are no declared stages', () => {
     expect(buildOrphanFilterPayload({ stages: [] })).toEqual([]);
     expect(buildOrphanFilterPayload({ stages: undefined })).toEqual([]);
+  });
+});
+
+describe('orphansFrom', () => {
+  const withStage = (id, stage) => ({
+    id,
+    custom_attributes: stage === undefined ? {} : { etapa_funil: stage },
+  });
+
+  it('keeps only conversations whose stage is no longer declared', () => {
+    const rows = [
+      withStage(1, 'Novo'),
+      withStage(2, 'Em curso'),
+      withStage(3, 'Resolvido'),
+      withStage(4, 'Etapa Antiga'),
+    ];
+
+    expect(orphansFrom(rows, ['Novo', 'Resolvido']).map(c => c.id)).toEqual([
+      2, 4,
+    ]);
+  });
+
+  // A consulta filtra por `is_present`, mas o resultado ainda passa por aqui — uma conversa
+  // sem a chave pertence a "Sem etapa", não à coluna de órfãs.
+  it('ignores conversations without the attribute', () => {
+    const rows = [withStage(1, undefined), withStage(2, ''), withStage(3, 'X')];
+
+    expect(orphansFrom(rows, ['Novo']).map(c => c.id)).toEqual([3]);
+  });
+
+  it('survives an empty or missing result', () => {
+    expect(orphansFrom([], ['Novo'])).toEqual([]);
+    expect(orphansFrom(undefined, ['Novo'])).toEqual([]);
   });
 });
 

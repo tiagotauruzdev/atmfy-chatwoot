@@ -18,6 +18,7 @@ import {
   buildOrphanFilterPayload,
   cardFrom,
   elapsedLabel,
+  orphansFrom,
   stageValuesFrom,
 } from './helpers';
 
@@ -108,28 +109,43 @@ const loadColumn = stage =>
     buildFilterPayload({ stage, inboxId: selectedInboxId.value })
   );
 
-const loadOrphans = () =>
-  fetchColumn(
-    ORPHAN_KEY,
-    buildOrphanFilterPayload({
-      stages: stages.value,
-      inboxId: selectedInboxId.value,
-    })
-  );
+// A coluna de órfãs é diagnóstico: se a consulta dela falhar, o quadro continua servindo.
+// Foi o que faltou na primeira versão — um 500 nessa consulta derrubava tudo.
+const loadOrphans = async () => {
+  const payload = buildOrphanFilterPayload({
+    stages: stages.value,
+    inboxId: selectedInboxId.value,
+  });
+  if (payload.length === 0) return;
+
+  try {
+    const { data } = await ConversationApi.filter({
+      queryData: { payload },
+      page: 1,
+    });
+    conversationsByStage.value = {
+      ...conversationsByStage.value,
+      [ORPHAN_KEY]: orphansFrom(data.payload, stages.value),
+    };
+  } catch (error) {
+    conversationsByStage.value = {
+      ...conversationsByStage.value,
+      [ORPHAN_KEY]: [],
+    };
+  }
+};
 
 const loadBoard = async () => {
   isLoading.value = true;
   loadError.value = false;
   try {
-    await Promise.all([
-      ...[null, ...stages.value].map(loadColumn),
-      loadOrphans(),
-    ]);
+    await Promise.all([null, ...stages.value].map(loadColumn));
   } catch (error) {
     loadError.value = true;
   } finally {
     isLoading.value = false;
   }
+  await loadOrphans();
 };
 
 const inboxes = useMapGetter('inboxes/getInboxes');

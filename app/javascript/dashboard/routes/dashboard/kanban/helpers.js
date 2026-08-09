@@ -156,10 +156,14 @@ export function buildFilterPayload({ stage, inboxId = null }) {
  * essas conversas não caíam em coluna nenhuma: nem nas etapas (o valor não bate),
  * nem em "Sem etapa" (a chave existe). Sumiam sem erro.
  *
- * A consulta é "tem a chave E não é nenhuma das etapas conhecidas". O motor de
- * filtro não tem `not_in` (ver `lib/filters/filter_keys.yml`), então vai um
- * `not_equal_to` por etapa encadeado com AND — o que também cobre valor vindo de
- * importação ou de escrita direta pela API, não só de renomeação.
+ * A consulta pede só "tem a chave"; a comparação com as etapas conhecidas fica no
+ * navegador (`orphansFrom`).
+ *
+ * A versão com `not_equal_to` por etapa parecia mais limpa e devolvia 500. O
+ * `custom_attribute_filter_helper.rb` cola um ` OR (...) IS NULL` DEPOIS do
+ * `query_operator`, produzindo `!= :valor AND  OR (...) IS NULL` — erro de sintaxe.
+ * Na prática `not_equal_to` sobre atributo customizado só funciona como ÚLTIMA
+ * condição da lista, o que torna impossível encadear uma por etapa.
  */
 export function buildOrphanFilterPayload({ stages, inboxId = null }) {
   // Sem etapa declarada toda conversa com a chave seria órfã; o quadro já mostra
@@ -172,11 +176,6 @@ export function buildOrphanFilterPayload({ stages, inboxId = null }) {
       filter_operator: 'is_present',
       values: [],
     },
-    ...stages.map(stage => ({
-      attribute_key: STAGE_ATTRIBUTE_KEY,
-      filter_operator: 'not_equal_to',
-      values: [stage],
-    })),
   ];
 
   if (inboxId !== null && inboxId !== undefined) {
@@ -191,4 +190,17 @@ export function buildOrphanFilterPayload({ stages, inboxId = null }) {
     ...condition,
     query_operator: index === conditions.length - 1 ? null : 'AND',
   }));
+}
+
+/**
+ * Separa, do resultado da consulta acima, as conversas cuja etapa não está mais
+ * declarada — as que sumiriam do quadro sem esta rede.
+ */
+export function orphansFrom(conversations, stages) {
+  const declared = new Set(stages || []);
+
+  return (conversations || []).filter(conversation => {
+    const stage = conversation.custom_attributes?.[STAGE_ATTRIBUTE_KEY];
+    return Boolean(stage) && !declared.has(stage);
+  });
 }
