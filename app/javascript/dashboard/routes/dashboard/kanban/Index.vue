@@ -15,10 +15,16 @@ import ConversationApi from 'dashboard/api/inbox/conversation';
 import {
   STAGE_ATTRIBUTE_KEY,
   buildFilterPayload,
+  buildOrphanFilterPayload,
   cardFrom,
   elapsedLabel,
   stageValuesFrom,
 } from './helpers';
+
+// Coluna que recolhe conversas cuja etapa nao existe mais na configuracao. Nao e uma
+// etapa: nao da para arrastar PARA ela, so PARA FORA — mover para uma etapa valida e
+// justamente como o operador conserta cada card.
+const ORPHAN_KEY = '__orphan__';
 
 // As prioridades são escritas pelo agente e configuradas pelo operador, então a lista pode
 // crescer — valor desconhecido cai no tom neutro em vez de sumir do card.
@@ -62,38 +68,63 @@ const keyOf = stage => (stage === null ? '__none__' : stage);
 // Cada item carrega a conversa crua ao lado do card já reduzido: o template desenha a
 // partir de `card`, e `moveTo` grava a partir de `conversation` — sem recalcular a
 // redução a cada render nem perder os campos que o card não mostra.
-const columns = computed(() =>
-  [null, ...stages.value].map(stage => ({
-    stage,
-    items: (conversationsByStage.value[keyOf(stage)] || []).map(
-      conversation => ({
-        id: conversation.id,
-        conversation,
-        card: cardFrom(conversation),
-      })
-    ),
-  }))
-);
+const toItems = key =>
+  (conversationsByStage.value[key] || []).map(conversation => ({
+    id: conversation.id,
+    conversation,
+    card: cardFrom(conversation),
+  }));
 
-const loadColumn = async stage => {
+const columns = computed(() => {
+  const declared = [null, ...stages.value].map(stage => ({
+    stage,
+    key: keyOf(stage),
+    items: toItems(keyOf(stage)),
+  }));
+
+  // A coluna de órfãs só existe quando tem alguém dentro: no dia a dia ela fica vazia,
+  // e uma coluna permanente de exceção vira ruído no quadro.
+  const orphans = toItems(ORPHAN_KEY);
+  if (orphans.length === 0) return declared;
+
+  return [...declared, { stage: ORPHAN_KEY, key: ORPHAN_KEY, items: orphans }];
+});
+
+const fetchColumn = async (key, payload) => {
   const { data } = await ConversationApi.filter({
-    queryData: {
-      payload: buildFilterPayload({ stage, inboxId: selectedInboxId.value }),
-    },
+    queryData: { payload },
     page: 1,
   });
 
   conversationsByStage.value = {
     ...conversationsByStage.value,
-    [keyOf(stage)]: data.payload || [],
+    [key]: data.payload || [],
   };
 };
+
+const loadColumn = stage =>
+  fetchColumn(
+    keyOf(stage),
+    buildFilterPayload({ stage, inboxId: selectedInboxId.value })
+  );
+
+const loadOrphans = () =>
+  fetchColumn(
+    ORPHAN_KEY,
+    buildOrphanFilterPayload({
+      stages: stages.value,
+      inboxId: selectedInboxId.value,
+    })
+  );
 
 const loadBoard = async () => {
   isLoading.value = true;
   loadError.value = false;
   try {
-    await Promise.all([null, ...stages.value].map(loadColumn));
+    await Promise.all([
+      ...[null, ...stages.value].map(loadColumn),
+      loadOrphans(),
+    ]);
   } catch (error) {
     loadError.value = true;
   } finally {
@@ -148,8 +179,15 @@ const openConversation = conversation => {
   });
 };
 
-const columnTitle = column =>
-  column.stage === null ? t('KANBAN.BOARD.NO_STAGE') : column.stage;
+const columnTitle = column => {
+  if (column.stage === null) return t('KANBAN.BOARD.NO_STAGE');
+  if (column.stage === ORPHAN_KEY) return t('KANBAN.BOARD.UNKNOWN_STAGE');
+  return column.stage;
+};
+
+// Arrastar PARA a coluna de órfãs gravaria "__orphan__" como etapa. Ela é diagnóstico,
+// não destino: sai gente dela, não entra.
+const acceptsDrop = column => column.stage !== ORPHAN_KEY;
 </script>
 
 <template>
@@ -202,23 +240,42 @@ const columnTitle = column =>
     <div v-else class="flex flex-1 gap-4 p-6 overflow-x-auto">
       <div
         v-for="column in columns"
-        :key="column.stage ?? '__none__'"
-        class="flex flex-col border w-72 shrink-0 rounded-xl bg-n-solid-1 border-n-weak"
+        :key="column.key"
+        class="flex flex-col border w-72 shrink-0 rounded-xl bg-n-solid-1"
+        :class="
+          column.stage === '__orphan__' ? 'border-n-amber-8' : 'border-n-weak'
+        "
       >
         <div
-          class="flex items-center justify-between px-3 py-2 border-b border-n-weak"
+          class="flex items-center justify-between gap-1 px-3 py-2 border-b border-n-weak"
         >
-          <span class="text-sm font-medium truncate text-n-slate-12">
+          <span
+            class="text-sm font-medium truncate"
+            :class="
+              column.stage === '__orphan__'
+                ? 'text-n-amber-11'
+                : 'text-n-slate-12'
+            "
+            :title="
+              column.stage === '__orphan__'
+                ? t('KANBAN.BOARD.UNKNOWN_STAGE_HINT')
+                : undefined
+            "
+          >
             {{ columnTitle(column) }}
           </span>
-          <span class="text-xs text-n-slate-10">
+          <span class="text-xs shrink-0 text-n-slate-10">
             {{ column.items.length }}
           </span>
         </div>
 
         <Draggable
           :model-value="column.items"
-          group="kanban"
+          :group="{
+            name: 'kanban',
+            pull: true,
+            put: acceptsDrop(column),
+          }"
           item-key="id"
           class="flex flex-col gap-2 p-2 overflow-y-auto grow min-h-16"
           @change="event => moveTo(column.stage, event)"

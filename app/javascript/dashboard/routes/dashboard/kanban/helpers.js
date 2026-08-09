@@ -147,8 +147,48 @@ export function buildFilterPayload({ stage, inboxId = null }) {
   }));
 }
 
-// NOTA: houve aqui um `buildColumns` que agrupava as conversas no navegador e
-// criava coluna para etapa órfã (valor gravado que o operador renomeou depois).
-// Saiu quando a busca passou para o servidor — o quadro agora pergunta só pelas
-// etapas declaradas, e conversa com etapa inválida fica invisível. Lacuna
-// conhecida, ainda em aberto: ver o handoff.
+/**
+ * Monta a consulta da coluna de etapas órfãs.
+ *
+ * Renomear uma etapa em Configurações não reescreve as conversas já gravadas — os
+ * callbacks de `CustomAttributeDefinition` só sincronizam o pré-chat do widget e
+ * invalidam cache de não lidas. Como cada coluna pergunta por uma etapa declarada,
+ * essas conversas não caíam em coluna nenhuma: nem nas etapas (o valor não bate),
+ * nem em "Sem etapa" (a chave existe). Sumiam sem erro.
+ *
+ * A consulta é "tem a chave E não é nenhuma das etapas conhecidas". O motor de
+ * filtro não tem `not_in` (ver `lib/filters/filter_keys.yml`), então vai um
+ * `not_equal_to` por etapa encadeado com AND — o que também cobre valor vindo de
+ * importação ou de escrita direta pela API, não só de renomeação.
+ */
+export function buildOrphanFilterPayload({ stages, inboxId = null }) {
+  // Sem etapa declarada toda conversa com a chave seria órfã; o quadro já mostra
+  // o aviso de atributo não configurado nesse caso.
+  if (!stages || stages.length === 0) return [];
+
+  const conditions = [
+    {
+      attribute_key: STAGE_ATTRIBUTE_KEY,
+      filter_operator: 'is_present',
+      values: [],
+    },
+    ...stages.map(stage => ({
+      attribute_key: STAGE_ATTRIBUTE_KEY,
+      filter_operator: 'not_equal_to',
+      values: [stage],
+    })),
+  ];
+
+  if (inboxId !== null && inboxId !== undefined) {
+    conditions.push({
+      attribute_key: 'inbox_id',
+      filter_operator: 'equal_to',
+      values: [String(inboxId)],
+    });
+  }
+
+  return conditions.map((condition, index) => ({
+    ...condition,
+    query_operator: index === conditions.length - 1 ? null : 'AND',
+  }));
+}

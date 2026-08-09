@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   STAGE_ATTRIBUTE_KEY,
   buildFilterPayload,
+  buildOrphanFilterPayload,
   cardFrom,
   elapsedLabel,
   stageValuesFrom,
@@ -62,6 +63,61 @@ describe('buildFilterPayload', () => {
       1
     );
     expect(buildFilterPayload({ stage: 'Novo' })).toHaveLength(1);
+  });
+});
+
+// Renomear uma etapa em Configurações NÃO reescreve as conversas já gravadas: elas ficam
+// com o nome antigo. Como cada coluna pergunta por uma etapa declarada, essas conversas
+// não apareciam em coluna nenhuma — nem em "Sem etapa", porque a chave existe. Sumiam sem
+// erro, que é o pior modo de falha. Esta consulta é a rede: tem a chave E não é nenhuma
+// das etapas conhecidas. O motor do Chatwoot não tem `not_in` (ver lib/filters/filter_keys.yml),
+// então é `is_present` encadeado com um `not_equal_to` por etapa.
+describe('buildOrphanFilterPayload', () => {
+  it('asks for conversations holding a stage that no longer exists', () => {
+    expect(buildOrphanFilterPayload({ stages: ['Novo', 'Resolvido'] })).toEqual(
+      [
+        {
+          attribute_key: STAGE_ATTRIBUTE_KEY,
+          filter_operator: 'is_present',
+          values: [],
+          query_operator: 'AND',
+        },
+        {
+          attribute_key: STAGE_ATTRIBUTE_KEY,
+          filter_operator: 'not_equal_to',
+          values: ['Novo'],
+          query_operator: 'AND',
+        },
+        {
+          attribute_key: STAGE_ATTRIBUTE_KEY,
+          filter_operator: 'not_equal_to',
+          values: ['Resolvido'],
+          query_operator: null,
+        },
+      ]
+    );
+  });
+
+  it('narrows to one inbox like the other columns do', () => {
+    const payload = buildOrphanFilterPayload({
+      stages: ['Novo'],
+      inboxId: 7,
+    });
+
+    expect(payload).toHaveLength(3);
+    expect(payload[2]).toEqual({
+      attribute_key: 'inbox_id',
+      filter_operator: 'equal_to',
+      values: ['7'],
+      query_operator: null,
+    });
+  });
+
+  // Sem etapa declarada não existe "órfã": toda conversa com a chave seria órfã, e o quadro
+  // ainda mostra o aviso de atributo não configurado. Devolver payload aqui traria tudo.
+  it('returns nothing when there are no declared stages', () => {
+    expect(buildOrphanFilterPayload({ stages: [] })).toEqual([]);
+    expect(buildOrphanFilterPayload({ stages: undefined })).toEqual([]);
   });
 });
 
