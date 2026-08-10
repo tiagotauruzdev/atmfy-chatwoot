@@ -160,6 +160,26 @@ RSpec.describe '/api/v1/widget/conversations/toggle_typing', type: :request do
       expect(contact.reload.custom_attributes['cpf']).to eq('123.456.789-09')
     end
 
+    it 'saves contact additional attributes on the widget contact' do
+      post '/api/v1/widget/conversations',
+           headers: { 'X-Auth-Token' => token },
+           params: {
+             website_token: web_widget.website_token,
+             contact: {
+               name: 'contact-name',
+               email: 'contact-email@chatwoot.com',
+               additional_attributes: { company_name: 'Google' }
+             },
+             message: {
+               content: 'This is a test message'
+             }
+           },
+           as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(contact.reload.additional_attributes['company_name']).to eq('Google')
+    end
+
     it 'saves contact custom attributes on the surviving contact when merged into an existing contact' do
       existing_contact = create(:contact, account: account, email: 'contact-email@chatwoot.com', custom_attributes: { 'cpf' => 'old-value' })
 

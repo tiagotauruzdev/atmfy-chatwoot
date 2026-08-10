@@ -86,4 +86,29 @@ describe('PreChatForm view', () => {
     expect(createConversation).not.toHaveBeenCalled();
     expect(setCustomAttributes).not.toHaveBeenCalled();
   });
+
+  it('routes the company field to contact additional attributes', async () => {
+    const wrapper = mountView();
+    wrapper.vm.onSubmit({
+      fullName: 'John',
+      emailAddress: 'john@example.com',
+      message: 'hey',
+      contactCustomAttributes: {
+        empresa: 'Google',
+        cpf: '123.456.789-09',
+      },
+      conversationCustomAttributes: {},
+    });
+    await flushPromises();
+
+    expect(createConversation).toHaveBeenCalledWith(expect.anything(), {
+      fullName: 'John',
+      emailAddress: 'john@example.com',
+      message: 'hey',
+      phoneNumber: undefined,
+      customAttributes: {},
+      contactCustomAttributes: { cpf: '123.456.789-09' },
+      contactAdditionalAttributes: { company_name: 'Google' },
+    });
+  });
 });

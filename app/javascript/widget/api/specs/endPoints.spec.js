@@ -33,7 +33,7 @@ describe('#sendMessage', () => {
 });
 
 describe('#createConversation', () => {
-  it('includes contact custom attributes in the payload', () => {
+  it('includes contact custom and additional attributes in the payload', () => {
     const spy = vi.spyOn(global, 'Date').mockImplementation(() => ({
       toString: () => 'mock date',
     }));
@@ -53,6 +53,7 @@ describe('#createConversation', () => {
       message: 'hey',
       customAttributes: { order_id: '12345' },
       contactCustomAttributes: { cpf: '123.456.789-09' },
+      contactAdditionalAttributes: { company_name: 'Google' },
     });
 
     expect(result).toEqual({
@@ -63,6 +64,7 @@ describe('#createConversation', () => {
           email: 'john@example.com',
           phone_number: '+919745313456',
           custom_attributes: { cpf: '123.456.789-09' },
+          additional_attributes: { company_name: 'Google' },
         },
         message: {
           content: 'hey',

@@ -4,15 +4,24 @@ import { generateEventParams } from './events';
 const createConversation = params => {
   const referrerURL = window.referrerURL || '';
   const search = buildSearchParamsWithLocale(window.location.search);
+  const contact = {
+    name: params.fullName,
+    email: params.emailAddress,
+    phone_number: params.phoneNumber,
+    custom_attributes: params.contactCustomAttributes,
+  };
+
+  if (
+    params.contactAdditionalAttributes &&
+    Object.keys(params.contactAdditionalAttributes).length > 0
+  ) {
+    contact.additional_attributes = params.contactAdditionalAttributes;
+  }
+
   return {
     url: `/api/v1/widget/conversations${search}`,
     params: {
-      contact: {
-        name: params.fullName,
-        email: params.emailAddress,
-        phone_number: params.phoneNumber,
-        custom_attributes: params.contactCustomAttributes,
-      },
+      contact,
       message: {
         content: params.message,
         timestamp: new Date().toString(),

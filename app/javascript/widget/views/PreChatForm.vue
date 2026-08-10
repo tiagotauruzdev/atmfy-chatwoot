@@ -41,7 +41,35 @@ export default {
       contactCustomAttributes,
       conversationCustomAttributes,
     }) {
-      // Contact custom attributes are sent within the same request that
+      const submittedContactCustomAttributes = contactCustomAttributes || {};
+      const companyAttributeKey = ['company_name', 'empresa'].find(attribute =>
+        Object.prototype.hasOwnProperty.call(
+          submittedContactCustomAttributes,
+          attribute
+        )
+      );
+      const normalizedContactCustomAttributes = Object.keys(
+        submittedContactCustomAttributes
+      ).reduce((attributes, attribute) => {
+        if (attribute !== 'company_name' && attribute !== 'empresa') {
+          attributes[attribute] = submittedContactCustomAttributes[attribute];
+        }
+        return attributes;
+      }, {});
+      const contactAdditionalAttributes = companyAttributeKey
+        ? {
+            company_name:
+              submittedContactCustomAttributes[companyAttributeKey],
+          }
+        : {};
+      const contactAttributes = {
+        custom_attributes: normalizedContactCustomAttributes,
+      };
+      if (Object.keys(contactAdditionalAttributes).length > 0) {
+        contactAttributes.additional_attributes = contactAdditionalAttributes;
+      }
+
+      // Contact attributes are sent within the same request that
       // identifies the contact. A separate update call would race the contact
       // merge on the server (matching email/phone) and write the values to
       // the destroyed contact, silently losing them.
@@ -55,7 +83,7 @@ export default {
             email: emailAddress,
             name: fullName,
             phone_number: phoneNumber,
-            custom_attributes: contactCustomAttributes,
+            ...contactAttributes,
           },
         });
       } else {
@@ -67,7 +95,10 @@ export default {
           message: message,
           phoneNumber: phoneNumber,
           customAttributes: conversationCustomAttributes,
-          contactCustomAttributes: contactCustomAttributes,
+          contactCustomAttributes: normalizedContactCustomAttributes,
+          ...(Object.keys(contactAdditionalAttributes).length > 0 && {
+            contactAdditionalAttributes,
+          }),
         });
       }
     },
